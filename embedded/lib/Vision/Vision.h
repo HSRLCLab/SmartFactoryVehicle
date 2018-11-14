@@ -13,7 +13,7 @@
 #include "Modular.h"
 #include "Servo.h"
 #include "Wire.h"
-#include "PixyI2C.h"
+#include "PixyCam_Lib/PixyI2C.h"
 #include "Configuration.h"
 
 struct VisionState {
