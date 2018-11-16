@@ -46,6 +46,7 @@ bool toNextStatus = true; // true if changing state, false if staying in state, 
 int messageCounter = 0;
 int numOfTasksToDo = 0;
 myJSONStr currentTask;
+void (*myFuncToCall)() = nullptr; // func to call in main-loop, for finite state machine
 
 // ===================================== my helper Functions =====================================
 
@@ -62,12 +63,14 @@ void loopNoTask()
         mcount2 = TaskMain->returnCurrentIterator();
         toNextStatus = false;
     }
+    mNetwP->loop();
     mcount2 = TaskMain->returnCurrentIterator();
     if (mcount2 > mcount)
     {
         toNextStatus = true;
         LOG2("Messages arrived");
         stat = status_main::status_hasRequest;
+        myFuncToCall = loopTask;
     }
     else if (mcount2 == mcount)
     {
@@ -89,6 +92,7 @@ void loopTask() // loops through all unhandeled tasks
     {
         LOG2("no messages");
         stat = status_main::status_noTask; // jump back to noTask status
+        myFuncToCall = loopNoTask;
     }
     else
     {
@@ -110,6 +114,7 @@ void loopTask() // loops through all unhandeled tasks
                 publishParams = false;
             mNetwP->publishMessage("Vehicle/" + mNetwP->getHostName() + "/ack", "{hostname:" + toparr[1] + "}"); // acknoledge message received and coming for transport
             stat = status_main::status_transporting;
+            myFuncToCall = transportBox1;
         }
         else
         {
@@ -130,6 +135,7 @@ void transportBox1() // used to transport the Smart Box, 1 is for Setup from Luc
     // if transported:
     mNetwP->publishMessage("Vehicle/" + mNetwP->getHostName() + "/ack", "{request:" + toparr[1] + "}"); // publish acknoledgement transported to Vehicle/...ID.../ack
     stat = status_main::status_hasRequest;
+    myFuncToCall = loopTask;
 };
 
 bool checkForUrgendTasks() // during transport checks if something is very urgent, true if urgent task arrived
@@ -153,6 +159,7 @@ void setup() // for initialisation
     mNetwP->subscribe("SmartBox/+/level");
     mNetwP->subscribe("SmartBox/+/decision");
     TaskMain = mNetwP->NetManTask_classPointer;
+    myFuncToCall = loopNoTask;
 
     if (true) // for debugging purpose, DELETE ON FINAL TODO
     {
@@ -170,28 +177,7 @@ void loop() // one loop per one cycle (SB full -> transported -> returned empty)
         delay(1000);
     }
 
-    switch (stat)
-    {
-    case status_main::status_noTask:
-    {
-        loopEmpty();
-        break;
-    }
-    case status_main::status_hasRequest:
-    {
-        loopTask();
-        break;
-    }
-    case status_main::status_transporting:
-    {
-        transportBox1();
-        break;
-    }
-    default:
-    {
-        LOG1("Wrong Status");
-    }
-    }
+    myFuncToCall();
 
     mNetwP->loop();
     if (publishParams)
