@@ -7,144 +7,135 @@
 #include <NetworkManager.h>
 #include <MainConfiguration.h>
 #include <NetworkManagerStructs.h>
+#include <LogConfiguration.h>
 #include <Sonar.h>
 #include <Chassis.h>
 #include <Hoist.h>
 #include <Vision.h>
+#include <SmartBoxList.h>
 
 // ===================================== Global Variables =====================================
-myJSONStr *JSarra;                   // used in NetworkManager.h, used for saving incoming Messages, FIFO order, see also MAX_JSON_MESSAGES_SAVED
-int my_json_counter = 0;             // is last element in array, used for referencing to the last Element, attention: pay attention to out of bound see MAX_JSON_MESSAGES_SAVED, DON'T TOUCH THIS: https://www.youtube.com/watch?v=otCpCn0l4Wo
-bool my_json_counter_isEmpty = true; // used in NetworkManager.h
-NetworkManager *mNetwP = 0;          // used for using NetworkManager access outside setup()
-Sonar *vehicleSonar;                 // used for Sonar access
-Vision *vehicleVision;               // used for Vision access
-Hoist *vehicleHoist;                 // used for Hoist access
-Chassis *vehicleChassis;             // used for Chassis access
-VehicleWebAPI *vehicleAPI;           // used for Sonar access
-const int log_level = 1;             // can have values from 0-3
-bool hasAnswered = false;            // variable used to see if Vehicle have answered
-bool publishParams = false;          // if SmartBox requests Vehicle to answer
-byte isLastRoundonError = 1;         // currently two max values are included, if both are not responding, this Variable will be set to true, must be min 1
-enum SBLevel                         // describes Smart Box level states, -5 is default if not set!
-{
-    full = 0,
-    empty = 1
-};
-void (*myFuncPtr)(int) = NULL; // Pointer for the following Functions: ... TODO
+myJSONStr *JSarra;          // used in NetworkManager.h, used for saving incoming Messages, FIFO order, see also MAX_JSON_MESSAGES_SAVED
+NetworkManager *mNetwP = 0; // used for using NetworkManager access outside setup()
+Sonar *vehicleSonar;        // used for Sonar access
+Vision *vehicleVision;      // used for Vision access
+Hoist *vehicleHoist;        // used for Hoist access
+Chassis *vehicleChassis;    // used for Chassis access
+VehicleWebAPI *vehicleAPI;  // used for Sonar access
+bool hasAnswered = false;   // variable used to see if Vehicle have answered
+bool publishParams = false; // if SmartBox requests Vehicle to answer
+bool publishAck = false;
+myJSONStr *tmp_mess; // pointer to array of messages, used for iteration of messages
+MQTTTasks *TaskMain; // filled in NetworkManager.cpp, used for saving incoming Messages, FIFO order
+SmartBoxList SB_hostnames;
 
-// ===================================== Function Headers of my helper Functions =====================================
-void transportBox1();
-void handleRequest(int ii);
-int returnNumOfTaksksToDo();
+// -.-.-.-.-.-.-.-.-.-.-.-.-.- used for Statuses -.-.-.-.-.-.-.-.-.-.-.-.-.-
+enum status_main // stores main status for Program run (main.cpp)
+{
+    status_noTask = 0,
+    status_hasRequest = 1,
+    status_handleRequest = 2,
+    status_transporting = 3,
+    status_transported = 4,
+    stauts_requestHandeled = 5
+};
+int mcount = 0; // needed for number of messages received, lower num
+int mcount2 = 0;
+status_main stat = status_main::status_noTask;
+bool toNextStatus = true; // true if changing state, false if staying in state, it's enshuring that certain code will only run once
+int messageCounter = 0;
+int numOfTasksToDo = 0;
+myJSONStr currentTask;
+
 // ===================================== my helper Functions =====================================
-String *returnMQTTtopics(String top) // returns String-Array of topics from MQTT topic structure, strings divided by /
-{
-    String tmp[MAX_MQTT_TOPIC_DEPTH];
-    int k1 = 0; // lower cut-bound
-    int k2 = 0; // upper cut-bound
-    int k3 = 0; // num of strings (must be below above!)
-    for (int i = 0; i < top.length(); i++)
-    {
-        if (top.charAt(i) == '/')
-        {
-            k1 = i + 1;
-            if (k3 == MAX_MQTT_TOPIC_DEPTH)
-                break;
-            else
-            {
-                tmp[k3] = top.substring(k1, k2);
-                k3++;
-            }
-        }
-        else
-        {
-            k2++;
-        }
-    }
-    String tmp2[k3];
-    for (int i = 0; i < k3; i++)
-    {
-        tmp2[i] = tmp[i];
-    }
-    return tmp2;
-};
 
-void transportBox1() // used to transport the Smart Box, 1 is for Setup from Luciano Bettinaglio, can be editted for other Setups
-{
-    // TODO
-}
-
-int returnNumOfTasksToDo()
-{
-    // TODO
-}
-
-void handleRequest(int ii) // handles Messages based on topic
-{
-    String toparr[] = returnMQTTtopics(JSarra[ii].topic);                     // 0: SmartBox, 1: SmartBox_ID, 2: level/decision
-    if ((toparr[0] == "SmartBox") && (toparr[2] == "level") && publishParams) // if SmartBox/+/level
-    {
-        mNetwP->publishMessage("Vehicle/" + mNetwP->getHostName() + "/params", "{params:[100,100" + String(returnNumOfTasksToDo()) + "] }"); // publish params [distance, velocity, tasks]
-        // TODO: define above signal/array list
-        // TODO: params in callback2 of SmartBox???
-    }
-    else if ((toparr[0] == "SmartBox") && (toparr[2] == "decision")) // if SmartBox/+/decision
-    {
-        // TODO check if decision for right request was made!
-        mNetwP->publishMessage("Vehicle/" + mNetwP->getHostName() + "/ack", "{hostname:" + toparr[1] + "}");
-        publishParams = false;
-        transportBox1();                                                                                    // transport Smart Box
-        mNetwP->publishMessage("Vehicle/" + mNetwP->getHostName() + "/ack", "{request:" + toparr[1] + "}"); // publish acknoledgement transported to Vehicle/...ID.../ack
-    }
-    else
-    {
-        Serial.println("topic: [" + JSarra[ii].topic + "] unknown, and therefore not treated here\t\t hostname: " + JSarra[ii].hostname + "\t Request: " + JSarra[ii].request);
-    }
-}
-
-// void getSmartBoxInfo(){}; // print Smart Box Information TODO
+// void getVehicleInfo(){}; // print Smart Box Information TODO
 
 // ===================================== my Functions =====================================
-// -.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.- wait for Answer (which vehicles are there?)
 
 void loopNoTask()
 {
-    int mcount = my_json_counter; // needed for number of messages received during checks
-    while (mcount == my_json_counter)
+    if (toNextStatus)
+    {
+        LOG1("entering new state: loopNoTask");
+        mcount = TaskMain->returnCurrentIterator();
+        mcount2 = TaskMain->returnCurrentIterator();
+        toNextStatus = false;
+    }
+    mcount2 = TaskMain->returnCurrentIterator();
+    if (mcount2 > mcount)
+    {
+        toNextStatus = true;
+        LOG2("Messages arrived");
+        stat = status_main::status_hasRequest;
+    }
+    else if (mcount2 == mcount)
     {
         mNetwP->loop();
-        delay(1000);
+        LOG3("nothing to do");
     }
-    mNetwP->loop();
+    else
+        LOG1("something is wrong... ");
 };
 
 void loopTask() // loops through all unhandeled tasks
 {
-    publishParams = true;
-    int mcount = my_json_counter; // needed for number of messages received during run
-
-    if (my_json_counter != mcount) // if new messages arriced during run
+    LOG1("entering new state: loopTask");
+    mNetwP->loop();
+    mcount2 = TaskMain->returnCurrentIterator();
+    tmp_mess = TaskMain->getBetween(mcount, mcount2);
+    numOfTasksToDo = (sizeof(tmp_mess) / sizeof(tmp_mess[0]));
+    if (tmp_mess == nullptr)
     {
-        if (mcount > my_json_counter)
+        LOG2("no messages");
+        stat = status_main::status_noTask; // jump back to noTask status
+    }
+    else
+    {
+        LOG3("num of tasks: " + String(numOfTasksToDo));
+        currentTask = tmp_mess[0]; // do first tasks
+        mcount++;
+        stat = status_main::status_handleRequest;
+        LOG3("going to do next task");
+        String toparr[] = TaskMain->returnMQTTtopics(currentTask); // array indexes: 0: SmartBox, 1: SmartBox_ID, 2: level/decision
+        if ((toparr[0] == "SmartBox") && (toparr[2] == "level"))   // if SmartBox/+/level
         {
-            for (int i = my_json_counter; i < MAX_JSON_MESSAGES_SAVED; i++)
-            {
-                handleRequest(i);
-            }
-            for (int i = 0; i < my_json_counter; i++)
-            {
-                handleRequest(i);
-            }
+            publishParams = true;
+            SB_hostnames.push(toparr[1]); // save hostname
         }
-        else // if mcount < my_json_counter
+        else if ((toparr[0] == "SmartBox") && SB_hostnames.isInList(toparr[1]) && (toparr[2] == "decision")) // if SmartBox/+/decision
         {
-            for (int i = mcount; i < my_json_counter; i++)
-            {
-                handleRequest(i);
-            }
+            SB_hostnames.pop(toparr[1]);
+            if (SB_hostnames.getSize() == 0)
+                publishParams = false;
+            mNetwP->publishMessage("Vehicle/" + mNetwP->getHostName() + "/ack", "{hostname:" + toparr[1] + "}"); // acknoledge message received and coming for transport
+            stat = status_main::status_transporting;
+        }
+        else
+        {
+            LOG3("topic: [" + currentTask.topic + "] unknown, and therefore not treated here\t\t hostname: " + currentTask.hostname + "\t Request: " + currentTask.request);
         }
     }
+};
+
+void transportBox1() // used to transport the Smart Box, 1 is for Setup from Luciano Bettinaglio, can be editted for other Setups
+{
+    //transport box TODO -> see other file to get right commands
+    // do move until condition set, call checkForUrgendTasks on regular basis
+    // TODO: möglichst schneller Durchlauf!
+    mNetwP->loop();
+    if (checkForUrgendTasks)
+        ; // TODO if urgent task arrived
+
+    // if transported:
+    mNetwP->publishMessage("Vehicle/" + mNetwP->getHostName() + "/ack", "{request:" + toparr[1] + "}"); // publish acknoledgement transported to Vehicle/...ID.../ack
+    stat = status_main::status_hasRequest;
+};
+
+bool checkForUrgendTasks() // during transport checks if something is very urgent, true if urgent task arrived
+{
+    return false;
+    // TODO
 };
 
 // ===================================== Arduino Functions =====================================
@@ -161,6 +152,7 @@ void setup() // for initialisation
     JSarra = mNetwP->JSarrP;
     mNetwP->subscribe("SmartBox/+/level");
     mNetwP->subscribe("SmartBox/+/decision");
+    TaskMain = mNetwP->NetManTask_classPointer;
 
     if (true) // for debugging purpose, DELETE ON FINAL TODO
     {
@@ -178,7 +170,42 @@ void loop() // one loop per one cycle (SB full -> transported -> returned empty)
         delay(1000);
     }
 
-    loopNoTask();
+    switch (stat)
+    {
+    case status_main::status_noTask:
+    {
+        loopEmpty();
+        break;
+    }
+    case status_main::status_hasRequest:
+    {
+        loopTask();
+        break;
+    }
+    case status_main::status_transporting:
+    {
+        transportBox1();
+        break;
+    }
+    default:
+    {
+        LOG1("Wrong Status");
+    }
+    }
 
-    loopTask();
+    mNetwP->loop();
+    if (publishParams)
+        mNetwP->publishMessage("Vehicle/" + mNetwP->getHostName() + "/params", "{params:[100,100" + String(numOfTasksToDo) + "] }"); // publish params [distance, velocity, tasks]
+    // TODO: define above signal/array list
+    // TODO: params in callback2 of SmartBox???
+
+    /*
+    if (publishAck)
+    {
+        for(int i=0; i<=SB_hostnames_it; i++)
+        {
+            mNetwP->publishMessage("Vehicle/" + mNetwP->getHostName() + "/ack", "{hostname:" + SB_hostnames[i] + "}");
+        }
+    }
+    */
 }
