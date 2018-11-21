@@ -50,7 +50,21 @@ void (*myFuncToCall)() = nullptr; // func to call in main-loop, for finite state
 
 // ===================================== my helper Functions =====================================
 
-// void getVehicleInfo(){}; // print Smart Box Information TODO
+void getVehicleInfo(){} // print Smart Box Information TODO
+{
+    LOG2("Vehicle state: " + String(stat));
+    LOG2("Variable has answered: " + String(hasAnswered));
+    LOG2("Variable mcount: " + String(mcount));
+    LOG2("Variable mcount2: " + String(mcount2));
+    LOG2("Variable toNextStatus: " + String(toNextStatus));
+    LOG2("Variable messageCounter: " + String(messageCounter));
+    LOG2("Variable numOfTasksToDo: " + String(numOfTasksToDo));
+    LOG2("-------- current Task --------");
+    LOG2("current Task (hostname): " + String(currentTask.hostname));
+    LOG2("current Task (topic): " + String(currentTask.topic));
+    LOG2("current Task (request): " + String(currentTask.request));
+    LOG2("current Task (level): " + String(currentTask.level));
+};
 
 // ===================================== my Functions =====================================
 
