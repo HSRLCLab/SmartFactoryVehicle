@@ -1,7 +1,7 @@
 /*
     Chassis.cpp - Library for mechatronic component chassis.
     The chassis contains 2 DC-lego-motors which power the movement of the chassis
-    and 5 IR-sensors which work as internal navigation components.
+    and 5 sens_IR-sensors which work as internal navigation components.
     Created by Glenn Huber, 03.05.2018
     Basecode by Robert Paly
 */
@@ -9,8 +9,9 @@
 #include "Arduino.h"
 #include "Chassis.h"
 
-Chassis::Chassis(int givenSpeed, float kp, float ki, float kd, int motorNumRight, int motorNumLeft, int sensorPin_0, int sensorPin_1, int sensorPin_2, int sensorPin_3, int sensorPin_4) {
-    if (DEBUGGER == true) Serial.print("Initializing chassis...");
+Chassis::Chassis(int givenSpeed, float kp, float ki, float kd, int motorNumRight, int motorNumLeft, int sensorPin_0, int sensorPin_1, int sensorPin_2, int sensorPin_3, int sensorPin_4)
+{
+    LOG1("Initializing chassis...");
     //Initializing sensors.
     sensorPin0 = sensorPin_0;
     sensorPin1 = sensorPin_1;
@@ -34,42 +35,42 @@ Chassis::Chassis(int givenSpeed, float kp, float ki, float kd, int motorNumRight
     previousSensorValue[3] = 0;
     previousSensorValue[4] = 0;
 
-    currentState.sensor[0] = 0;
-    currentState.sensor[1] = 0;
-    currentState.sensor[2] = 0;
-    currentState.sensor[3] = 0;
-    currentState.sensor[4] = 0;
+    sensor[0] = 0;
+    sensor[1] = 0;
+    sensor[2] = 0;
+    sensor[3] = 0;
+    sensor[4] = 0;
 
     //Initializing motors.
     numRight = motorNumRight;
     numLeft = motorNumLeft;
     AFMS = Adafruit_MotorShield();
     motorRight = AFMS.getMotor(numRight);
-    motorLeft  = AFMS.getMotor(numLeft);
+    motorLeft = AFMS.getMotor(numLeft);
     AFMS.begin();
-    currentState.speed = givenSpeed;
+    speed = givenSpeed;
 
     //Initializing PID values.
     KP = kp;
     KI = ki;
     KD = kd;
-    error           = 0;
-    PValue          = 0;
-    IValue          = 0;
-    DValue          = 0;
-    PIDValue        = 0;
-    previousPIDValue= 0;
-    previousError   = 0;
-    previousI       = 0;
-    korr            = -0.01;
-    korr1           = 0;
-    korr2           = 0;
-    leftMotorSpeed  = 0;
+    error = 0;
+    PValue = 0;
+    IValue = 0;
+    DValue = 0;
+    PIDValue = 0;
+    previousPIDValue = 0;
+    previousError = 0;
+    previousI = 0;
+    korr = -0.01;
+    korr1 = 0;
+    korr2 = 0;
+    leftMotorSpeed = 0;
     rightMotorSpeed = 0;
     leftMotorSpeed1 = 0;
-    rightMotorSpeed1= 0;
+    rightMotorSpeed1 = 0;
     targetSpeedLeft = 0;
-    targetSpeedRight= 0;
+    targetSpeedRight = 0;
 
     //Initializing timevariables
     millisOfDriving = 0;
@@ -80,63 +81,97 @@ Chassis::Chassis(int givenSpeed, float kp, float ki, float kd, int motorNumRight
     turnCounter = 0;
     crossCounterLeft = 0;
     crossCounterRight = 0;
-    if (DEBUGGER == true) Serial.println(" complete!");
+
+    LOG3(" complete!");
 }
 
-void Chassis::loop(ChassisState *state) {
-    if (state->IR == false) {
-        currentState.IR = false;
-        state->IR = true;
+void Chassis::loop(ChassisState *state)
+{
+    if (state->sens_IR == false)
+    {
+        sens_IR = false;
+        state->sens_IR = true;
     }
-    currentState.speed = state->speed;
-    currentState.direction = state->direction;
-    readSensor(); 
+    speed = state->speed;
+    currentState.dsens_IRection = state->dsens_IRection;
+    readSensor();
 
-    state->directionError = currentState.directionError;
-    state->sensor[0] = currentState.sensor[0];
-    state->sensor[1] = currentState.sensor[1];
-    state->sensor[2] = currentState.sensor[2];
-    state->sensor[3] = currentState.sensor[3];
-    state->sensor[4] = currentState.sensor[4];
+    state->dsens_IRectionError = dsens_IRectionError;
+    state->sensor[0] = sensor[0];
+    state->sensor[1] = sensor[1];
+    state->sensor[2] = sensor[2];
+    state->sensor[3] = sensor[3];
+    state->sensor[4] = sensor[4];
 
     calculatePID();
-    
-    state->PidValue = currentState.PidValue;
 
-    if (currentState.actionDone == true) {
-        state->actionDone = currentState.actionDone;
-        currentState.actionDone = false;
-        if (DEBUGGER == true) Serial.println("Inside actiondone statement");
-        if (DEBUGGER == true) Serial.print("currentState.actionDone: "); if (DEBUGGER == true) Serial.println(currentState.actionDone);
+    state->PidValue = ppidValue;
+
+    if (actionDone == true)
+    {
+        state->actionDone = actionDone;
+        actionDone = false;
+
+        LOG3("Inside actiondone statement");
+
+        LOG3("actionDone: ");
+
+        LOG3(actionDone);
     }
 }
 
-void Chassis::readSensor() {
+void Chassis::readSensor()
+{
     //Read sensor values
-    if (DEBUGGER == true) Serial.println("sensorreading");
+
+    LOG3("sensorreading");
     sensor0 = digitalRead(sensorPin0);
     sensor1 = digitalRead(sensorPin1);
     sensor2 = digitalRead(sensorPin2);
     sensor3 = digitalRead(sensorPin3);
     sensor4 = digitalRead(sensorPin4);
 
-    previousSensorValue[0] = currentState.sensor[0];
-    previousSensorValue[1] = currentState.sensor[1];
-    previousSensorValue[2] = currentState.sensor[2];
-    previousSensorValue[3] = currentState.sensor[3];
-    previousSensorValue[4] = currentState.sensor[4];
-    if (DEBUGGER == true) Serial.print("previousValues: "); if (DEBUGGER == true) Serial.print(previousSensorValue[0]); if (DEBUGGER == true) Serial.print(previousSensorValue[1]); if (DEBUGGER == true) Serial.print(previousSensorValue[2]); if (DEBUGGER == true) Serial.print(previousSensorValue[3]); if (DEBUGGER == true) Serial.println(previousSensorValue[4]);
+    previousSensorValue[0] = sensor[0];
+    previousSensorValue[1] = sensor[1];
+    previousSensorValue[2] = sensor[2];
+    previousSensorValue[3] = sensor[3];
+    previousSensorValue[4] = sensor[4];
 
-    currentState.sensor[0] = sensor0;
-    currentState.sensor[1] = sensor1;
-    currentState.sensor[2] = sensor2;
-    currentState.sensor[3] = sensor3;
-    currentState.sensor[4] = sensor4;
-    if (DEBUGGER == true) Serial.print("actualValues: "); if (DEBUGGER == true) Serial.print(currentState.sensor[0]); if (DEBUGGER == true) Serial.print(currentState.sensor[1]); if (DEBUGGER == true) Serial.print(currentState.sensor[2]); if (DEBUGGER == true) Serial.print(currentState.sensor[3]); if (DEBUGGER == true) Serial.println(currentState.sensor[4]);
+    LOG3("previousValues: ");
+
+    LOG3(previousSensorValue[0]);
+
+    LOG3(previousSensorValue[1]);
+
+    LOG3(previousSensorValue[2]);
+
+    LOG3(previousSensorValue[3]);
+
+    LOG3(previousSensorValue[4]);
+
+    sensor[0] = sensor0;
+    sensor[1] = sensor1;
+    sensor[2] = sensor2;
+    sensor[3] = sensor3;
+    sensor[4] = sensor4;
+
+    LOG3("actualValues: ");
+
+    LOG3(sensor[0]);
+
+    LOG3(sensor[1]);
+
+    LOG3(sensor[2]);
+
+    LOG3(sensor[3]);
+
+    LOG3(sensor[4]);
 
     //If no fullline is detected let the sensors read the lines for normal motorcontrol
-    if (currentState.fullLine == false) {
-        if (DEBUGGER == true) Serial.println("Normal sensorreading");
+    if (currentState.fullLine == false)
+    {
+
+        LOG3("Normal sensorreading");
         if ((sensor0 == 0) && (sensor1 == 0) && (sensor2 == 0) && (sensor3 == 0) && (sensor4 == 1))
             error = 4;
         else if ((sensor0 == 0) && (sensor1 == 0) && (sensor2 == 0) && (sensor3 == 1) && (sensor4 == 1))
@@ -155,99 +190,119 @@ void Chassis::readSensor() {
             error = -3;
         else if ((sensor0 == 1) && (sensor1 == 0) && (sensor2 == 0) && (sensor3 == 0) && (sensor4 == 0))
             error = -4;
-        else if ((sensor0 == 1) && (sensor1 == 1) && (sensor2 == 1) && (sensor3 == 0) && (sensor4 == 0))//90°-Kurve
+        else if ((sensor0 == 1) && (sensor1 == 1) && (sensor2 == 1) && (sensor3 == 0) && (sensor4 == 0)) //90°-Kurve
             error = -10;
         else if ((sensor0 == 0) && (sensor1 == 0) && (sensor2 == 1) && (sensor3 == 1) && (sensor4 == 1)) //90°-Kurve
             error = 10;
-        else if ((sensor0 == 1) && (sensor1 == 1) && (sensor2 == 1) && (sensor3 == 1) && (sensor4 == 1)) {   
+        else if ((sensor0 == 1) && (sensor1 == 1) && (sensor2 == 1) && (sensor3 == 1) && (sensor4 == 1))
+        {
             currentState.fullLine = true;
         }
         //Conditions for lost navigation lines
         else if ((sensor0 == 0) && (sensor1 == 0) && (sensor2 == 0) && (sensor3 == 0) && (sensor4 == 0))
         {
-            if (error == -4) 
-                error = -5;  //If outer sensor loses line, turn hard.
+            if (error == -4)
+                error = -5; //If outer sensor loses line, turn hard.
             else if (error == 4)
                 error = 5;
         }
     }
     //Conditions for fulllines
-    if (currentState.fullLine == true) {
-        if ((((sensor0 == 0) && (sensor4 == 0)) || (currentState.direction == "stop")) && (currentState.IR == true)) {
+    if (currentState.fullLine == true)
+    {
+        if ((((sensor0 == 0) && (sensor4 == 0)) || (currentState.dsens_IRection == "stop")) && (sens_IR == true))
+        {
             currentState.fullLine = false;
-            if (DEBUGGER == true) Serial.println("changing actiondone because of fulline");
-            currentState.actionDone = true;
+
+            LOG3("changing actiondone because of fulline");
+            actionDone = true;
         }
-        if (currentState.direction == "right") {
+        if (currentState.dsens_IRection == "right")
+        {
             error = 5;
-            if (DEBUGGER == true) Serial.print("Error: Cross"); if (DEBUGGER == true) Serial.println(error);
+
+            LOG3("Error: Cross");
+
+            LOG3(error);
         }
-        if (currentState.direction == "straight") {
+        if (currentState.dsens_IRection == "straight")
+        {
             error = 0;
-            if (DEBUGGER == true) Serial.print("Error: Cross"); if (DEBUGGER == true) Serial.println(error);
+
+            LOG3("Error: Cross");
+
+            LOG3(error);
         }
-        if (currentState.direction == "left") {
+        if (currentState.dsens_IRection == "left")
+        {
             error = -5;
-            if (DEBUGGER == true) Serial.print("Error: Cross"); if (DEBUGGER == true) Serial.println(error);
+
+            LOG3("Error: Cross");
+
+            LOG3(error);
         }
-        if (currentState.direction == "stop") {
+        if (currentState.dsens_IRection == "stop")
+        {
             error = 0;
-            if (DEBUGGER == true) Serial.println("error = 0");
+
+            LOG3("error = 0");
         }
     }
-    currentState.directionError = error;
+    dsens_IRectionError = error;
 }
 
-void Chassis::calculatePID() {
+void Chassis::calculatePID()
+{
     //previousPIDValue = PIDValue;
-    PValue           = error;
-    IValue           = IValue + error;
-    DValue           = PIDValue - previousPIDValue;
-    IValue           = constrain(IValue, -300, 300);
+    PValue = error;
+    IValue = IValue + error;
+    DValue = PIDValue - previousPIDValue;
+    IValue = constrain(IValue, -300, 300);
 
     //Print out values of the controller
-    if (DEBUGGER == true) Serial.print(" I= ");
-    if (DEBUGGER == true) Serial.print(IValue);
-    if (DEBUGGER == true) Serial.print(" P= ");
-    if (DEBUGGER == true) Serial.print(PValue);
-    if (DEBUGGER == true) Serial.print(" D= ");
-    if (DEBUGGER == true) Serial.print(DValue);
-
+    LOG3(" I= " + String(IValue) + " P= " + String(PValue) + " D= " + String(DValue));
     PIDValue = (KP * PValue) + (KI * IValue) * (KD * DValue);
     previousError = error;
-    if ((sensor0 == 0) && (sensor1 == 0) && (sensor2 == 1) && (sensor3 == 0) && (sensor4 == 0)) {
-        if ((IValue > 10) || (IValue < -10)) {
+    if ((sensor0 == 0) && (sensor1 == 0) && (sensor2 == 1) && (sensor3 == 0) && (sensor4 == 0))
+    {
+        if ((IValue > 10) || (IValue < -10))
+        {
             IValue = 0.95 * IValue;
         }
-        else {
+        else
+        {
             IValue = 0;
         }
     }
-    currentState.PidValue = PIDValue;
+    ppidValue = PIDValue;
 
-    if (DEBUGGER == true) Serial.print("PID = ");
-    if (DEBUGGER == true) Serial.println(currentState.PidValue);
+    LOG3("PID = " + String(PIDValue));
 }
 
-void Chassis::motorControl(float sonarFactor) {
-    if (currentState.speed == 0) {
-        if (DEBUGGER == true) Serial.println("stopping inside motorcontrol");
+void Chassis::motorControl(float sonarFactor)
+{
+    if (speed == 0)
+    {
+
+        LOG3("stopping inside motorcontrol");
         stop();
     }
-    else {
-        if (DEBUGGER == true) Serial.println("Motorcontrol");
+    else
+    {
+
+        LOG3("Motorcontrol");
         korr2 = 1 - korr;
         korr1 = 1 + korr;
 
-        leftMotorSpeed = currentState.speed + currentState.PidValue;
-        rightMotorSpeed= currentState.speed - currentState.PidValue;
-        leftMotorSpeed1= constrain(leftMotorSpeed, 0, currentState.speed + 50);
-        rightMotorSpeed1=constrain(rightMotorSpeed, 0, currentState.speed + 50);
+        leftMotorSpeed = speed + ppidValue;
+        rightMotorSpeed = speed - ppidValue;
+        leftMotorSpeed1 = constrain(leftMotorSpeed, 0, speed + 50);
+        rightMotorSpeed1 = constrain(rightMotorSpeed, 0, speed + 50);
 
         //Calculate the speed for both motors individualy
-        if (DEBUGGER == true) Serial.print("SonarFactor inside MotorControl: "); if (DEBUGGER == true) Serial.println(sonarFactor);
+        LOG3("SonarFactor inside MotorControl: " + String(sonarFactor));
         targetSpeedLeft = sonarFactor * korr2 * leftMotorSpeed1;
-        targetSpeedRight= sonarFactor * korr1 * rightMotorSpeed1;
+        targetSpeedRight = sonarFactor * korr1 * rightMotorSpeed1;
 
         motorLeft->run(FORWARD);
         motorRight->run(FORWARD);
@@ -259,194 +314,221 @@ void Chassis::motorControl(float sonarFactor) {
         //Drivespeed settings
         motorLeft->setSpeed(targetSpeedLeft);
         motorRight->setSpeed(targetSpeedRight);
-
-        if (DEBUGGER == true) Serial.println("Speed of motors: ");
-        if (DEBUGGER == true) Serial.print(targetSpeedLeft); if (DEBUGGER == true) Serial.print(" || "); if (DEBUGGER == true) Serial.println(targetSpeedRight);
+        LOG3("Speed of motors: " + String(targetSpeedLeft) + " || " + String(targetSpeedRight));
     }
 }
 
-int Chassis::getStartSpeedLeft() {
-    if (targetSpeedLeft < 30) {
+int Chassis::getStartSpeedLeft()
+{
+    if (targetSpeedLeft < 30)
+    {
         return 0;
     }
-    else if ((targetSpeedLeft >= 30) && (targetSpeedLeft < 60)) {
+    else if ((targetSpeedLeft >= 30) && (targetSpeedLeft < 60))
+    {
         return 100;
     }
-    else {
+    else
+    {
         return 60;
     }
 }
 
-int Chassis::getStartSpeedRight() {
-    if (targetSpeedRight < 30) {
+int Chassis::getStartSpeedRight()
+{
+    if (targetSpeedRight < 30)
+    {
         return 0;
     }
-    else if ((targetSpeedRight >= 30) && (targetSpeedRight < 60)) {
+    else if ((targetSpeedRight >= 30) && (targetSpeedRight < 60))
+    {
         return 100;
     }
-    else {
+    else
+    {
         return 60;
     }
 }
 
-void Chassis::stop() {
+void Chassis::stop()
+{
     motorLeft->setSpeed(0);
-    motorRight->setSpeed(0);    
-    if (DEBUGGER == true) Serial.println("Vehicle stopped");
+    motorRight->setSpeed(0);
+    LOG3("Vehicle stopped");
 }
 
-void Chassis::driveBack() {
+void Chassis::driveBack()
+{
     motorLeft->run(BACKWARD);
     motorRight->run(BACKWARD);
     motorLeft->setSpeed(PUSH_SPEED);
     motorRight->setSpeed(PUSH_SPEED);
-    motorLeft->setSpeed(currentState.speed);
-    motorRight->setSpeed(currentState.speed);
+    motorLeft->setSpeed(speed);
+    motorRight->setSpeed(speed);
 }
 
-void Chassis::driveBackLimited(unsigned int driveTime, unsigned long startTime) {
+void Chassis::driveBackLimited(unsigned int driveTime, unsigned long startTime)
+{
     unsigned long actualMillis = millis();
     millisOfDriving = actualMillis - startTime;
-    if (millisOfDriving > driveTime) {
+    if (millisOfDriving > driveTime)
+    {
         motorLeft->setSpeed(0);
         motorRight->setSpeed(0);
-        currentState.actionDone = true;
-        if (DEBUGGER == true) Serial.println("Changing actiondone because of driveback");
-        currentState.IR = true;
+        actionDone = true;
+        LOG3("Changing actiondone because of driveback");
+        sens_IR = true;
     }
-    else {
-        currentState.IR = false;
+    else
+    {
+        sens_IR = false;
         motorLeft->run(BACKWARD);
         motorRight->run(BACKWARD);
         motorLeft->setSpeed(PUSH_SPEED);
-        motorLeft->setSpeed(currentState.speed);
+        motorLeft->setSpeed(speed);
         motorRight->setSpeed(PUSH_SPEED);
-        motorRight->setSpeed(currentState.speed);
-        if (DEBUGGER == true) Serial.println("Driving back");
+        motorRight->setSpeed(speed);
+        LOG3("Driving back");
     }
 }
 
-void Chassis::driveStraightLimited(unsigned int driveTime, unsigned long startTime) {
+void Chassis::driveStraightLimited(unsigned int driveTime, unsigned long startTime)
+{
     unsigned long actualMillis = millis();
     millisOfDriving = actualMillis - startTime;
-    if (DEBUGGER == true) Serial.print("millifOfDriving: ");
-    if (DEBUGGER == true) Serial.println(millisOfDriving);
-    if (millisOfDriving > driveTime) {
+    LOG3("millifOfDriving: ");
+    LOG3(millisOfDriving);
+    if (millisOfDriving > driveTime)
+    {
         motorRight->setSpeed(0);
         motorLeft->setSpeed(0);
-        currentState.actionDone = true;
-        if (DEBUGGER == true) Serial.println("Changing actiondone because of drivestraight");
-        if (DEBUGGER == true) Serial.println("ifcase inside drive straight");
-        currentState.IR = true;
+        actionDone = true;
+        LOG3("Changing actiondone because of drivestraight");
+        LOG3("ifcase inside drive straight");
+        sens_IR = true;
     }
-    else {
-        currentState.IR = false;
+    else
+    {
+        sens_IR = false;
         motorLeft->run(FORWARD);
         motorRight->run(FORWARD);
         motorLeft->setSpeed(PUSH_SPEED);
         motorRight->setSpeed(PUSH_SPEED);
-        motorLeft->setSpeed(currentState.speed);
-        motorRight->setSpeed(currentState.speed);
-        if (DEBUGGER == true) Serial.println("elsecase inside drive straight");
+        motorLeft->setSpeed(speed);
+        motorRight->setSpeed(speed);
+        LOG3("elsecase inside drive straight");
     }
 }
 
-void Chassis::driveStraight() {
+void Chassis::driveStraight()
+{
     motorLeft->run(FORWARD);
     motorRight->run(FORWARD);
     motorLeft->setSpeed(PUSH_SPEED);
     motorRight->setSpeed(PUSH_SPEED);
-    motorLeft->setSpeed(currentState.speed);
-    motorRight->setSpeed(currentState.speed);
+    motorLeft->setSpeed(speed);
+    motorRight->setSpeed(speed);
 }
 
-void Chassis::turnLeftLimited(unsigned int curveTime, unsigned long startTime) {
+void Chassis::turnLeftLimited(unsigned int curveTime, unsigned long startTime)
+{
     motorLeft->setSpeed(0);
     unsigned long actualMillis = millis();
     millisOfDriving = actualMillis - startTime;
-    if (DEBUGGER == true) Serial.print("millifOfDriving: ");
-    if (DEBUGGER == true) Serial.println(millisOfDriving);
-    if (millisOfDriving > curveTime) {
+    LOG3("millifOfDriving: ");
+    LOG3(millisOfDriving);
+    if (millisOfDriving > curveTime)
+    {
         motorRight->setSpeed(0);
-        currentState.actionDone = true;
-        if (DEBUGGER == true) Serial.println("Changing actiondone because of turnleft");
-        if (DEBUGGER == true) Serial.println("ifcase inside turn left");
-        currentState.IR = true;
+        actionDone = true;
+        LOG3("Changing actiondone because of turnleft");
+        LOG3("ifcase inside turn left");
+        sens_IR = true;
     }
-    else {
-        currentState.IR = false;
+    else
+    {
+        sens_IR = false;
         motorRight->run(FORWARD);
         motorRight->setSpeed(PUSH_SPEED);
-        motorRight->setSpeed(currentState.speed);
-        if (DEBUGGER == true) Serial.println("elsecase inside turn left");
+        motorRight->setSpeed(speed);
+        LOG3("elsecase inside turn left");
     }
 }
 
-void Chassis::turnLeft() {
+void Chassis::turnLeft()
+{
     motorLeft->run(RELEASE);
     motorRight->run(FORWARD);
     motorRight->setSpeed(PUSH_SPEED);
-    motorRight->setSpeed(currentState.speed);
-    if (DEBUGGER == true) Serial.println("Turnleft");
+    motorRight->setSpeed(speed);
+    LOG3("Turnleft");
 }
 
-void Chassis::turnRightLimited(unsigned int curveTime, unsigned long startTime) {
+void Chassis::turnRightLimited(unsigned int curveTime, unsigned long startTime)
+{
     motorRight->setSpeed(0);
     unsigned long actualMillis = millis();
     millisOfDriving = actualMillis - startTime;
-    if (DEBUGGER == true) Serial.print("millifOfDriving: ");
-    if (DEBUGGER == true) Serial.println(millisOfDriving);
-    if (millisOfDriving > curveTime) {
+    LOG3("millifOfDriving: ");
+    LGO3(millisOfDriving);
+    if (millisOfDriving > curveTime)
+    {
         motorLeft->setSpeed(0);
-        currentState.actionDone = true;
-        if (DEBUGGER == true) Serial.println("Changing actiondone because of turnright");
-        if (DEBUGGER == true) Serial.println("ifcase inside turn right");
-        currentState.IR = true;
+        actionDone = true;
+        LOG3("Changing actiondone because of turnright");
+        LOG3("ifcase inside turn right");
+        sens_IR = true;
     }
-    else {
-        currentState.IR = false;
+    else
+    {
+        sens_IR = false;
         motorLeft->run(FORWARD);
         motorLeft->setSpeed(PUSH_SPEED);
-        motorLeft->setSpeed(currentState.speed);
-        if (DEBUGGER == true) Serial.println("elsecase inside turn right");
+        motorLeft->setSpeed(speed);
+        LOG3("elsecase inside turn right");
     }
 }
 
-void Chassis::turnRight() {
+void Chassis::turnRight()
+{
     motorRight->run(RELEASE);
     motorLeft->run(FORWARD);
     motorLeft->setSpeed(PUSH_SPEED);
-    motorLeft->setSpeed(currentState.speed);
-    if (DEBUGGER == true) Serial.println("Turnright");
+    motorLeft->setSpeed(speed);
+    LOG3("Turnright");
 }
 
-void Chassis::turnAround(int sensor) {
+void Chassis::turnAround(int sensor)
+{
     int i = sensor;
-    if (DEBUGGER == true) Serial.println("Inside turnaround");
-    if (currentState.actionDone == false) {
+    LOG3("Inside turnaround");
+    if (actionDone == false)
+    {
         motorLeft->run(BACKWARD);
         motorRight->run(FORWARD);
         motorLeft->setSpeed(PUSH_SPEED);
-        motorLeft->setSpeed(currentState.speed);
+        motorLeft->setSpeed(speed);
         motorRight->setSpeed(PUSH_SPEED);
-        motorRight->setSpeed(currentState.speed);
-        if (DEBUGGER == true) Serial.println("Turnaround");
-        if (DEBUGGER == true) Serial.print("turnCounter: "); if (DEBUGGER == true) Serial.println(turnCounter);
-        if (DEBUGGER == true) Serial.print("currentsensor: "); if (DEBUGGER == true) Serial.println(currentState.sensor[i]);
-        if (DEBUGGER == true) Serial.print("Sensor: "); if (DEBUGGER == true) Serial.println(i);
-        currentState.IR = false;
+        motorRight->setSpeed(speed);
+        LOG3("Turnaround");
+        LOG3("turnCounter: " + String(turnCounter));
+        LOG3("currentsensor: " + String(sensor[i]);
+        LOG3("Sensor: " + String(i));
+        sens_IR =false;
     }
-    if ((currentState.sensor[i] == 0) && (turnCounter == 0)) {
+    if ((sensor[i] == 0) && (turnCounter == 0))
+    {
         turnCounter++;
-        if (DEBUGGER == true) Serial.println("turncounter incrementing");
+        LOG3("turncounter incrementing");
     }
-    if ((previousSensorValue[i] == 0) && (currentState.sensor[i] == 1) && (turnCounter == 1)) {
-        currentState.actionDone = true;
-        if (DEBUGGER == true) Serial.println("Changing actiondone because of turnaround");
-        currentState.IR = true;
+    if ((previousSensorValue[i] == 0) && (sensor[i] == 1) && (turnCounter == 1))
+    {
+        actionDone = true;
+        LOG3("Changing actiondone because of turnaround");
+        sens_IR = true;
         turnCounter = 0;
         motorLeft->setSpeed(0);
         motorRight->setSpeed(0);
-        if (DEBUGGER == true) Serial.println("Turnaround complete");
+        LOG3("Turnaround complete");
     }
 }

@@ -1,8 +1,10 @@
 /*
     Library to contain the configuratioindetails of the different modules
     Created by Glenn Huber, 03.05.2018
+    THIS FILE IS DEPRECATED, THEREFORE EVERYTHING IS COMMENTED OUT!
 */
 
+/*
 //Option to activate the Serial.print
 #define DEBUGGER true
 
@@ -71,3 +73,6 @@
 #define LISTEN_PORT 80
 #define SENDING_PORT 1880
 //////////////////////////////////
+
+
+*/

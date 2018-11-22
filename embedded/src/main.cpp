@@ -168,6 +168,10 @@ void setup() // for initialisation
             ; // wait for serial port to connect
     }
     mNetwP = new NetworkManager();
+    vehicleSonar = new Sonar(SONAR_SERVO_PIN, SONAR_TRIGGER_PIN, SONAR_ECHO_PIN, SONAR_MAX_DISTANCE, MIN_ERROR, MAX_ERROR, MIN_TURN_ANGLE, MAX_TURN_ANGLE);
+    vehicleVision = new Vision(VISION_START_ANGLE, VISION_SERVO_PIN, VISION_DELAY_FACTOR, VISION_TOLERANCE_LEFT, VISION_TOLERANCE_RIGHT);
+    vehicleHoist = new Hoist(HOIST_SERVO_PIN, HOIST_SERVO_DELAY, HOIST_POISITION_MAX, HOIST_POSITION_MIN);
+
     // TODO: #define isVehicle true/false -> verschiedene main.cpp laden
     JSarra = mNetwP->JSarrP;
     mNetwP->subscribe("SmartBox/+/level");
