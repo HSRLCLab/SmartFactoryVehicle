@@ -85,23 +85,23 @@ Chassis::Chassis(int givenSpeed, float kp, float ki, float kd, int motorNumRight
     LOG3(" complete!");
 }
 
-void Chassis::loop(ChassisState *state)
+void Chassis::loop(bool sens_IRR, int speedd, String directionn, int direcErrr)
 {
-    if (state->sens_IR == false)
+    if (sens_IRR == false)
     {
         sens_IR = false;
-        state->sens_IR = true;
+        sens_IRR = true;
     }
-    speed = state->speed;
-    currentState.dsens_IRection = state->dsens_IRection;
+    speed = speedd;
+    direc = directionn;
     readSensor();
 
-    state->dsens_IRectionError = dsens_IRectionError;
-    state->sensor[0] = sensor[0];
-    state->sensor[1] = sensor[1];
-    state->sensor[2] = sensor[2];
-    state->sensor[3] = sensor[3];
-    state->sensor[4] = sensor[4];
+    direcErr = direcErrr;
+    sensor[0] = sensor[0];
+    sensor[1] = sensor[1];
+    sensor[2] = sensor[2];
+    sensor[3] = sensor[3];
+    sensor[4] = sensor[4];
 
     calculatePID();
 
@@ -112,11 +112,7 @@ void Chassis::loop(ChassisState *state)
         state->actionDone = actionDone;
         actionDone = false;
 
-        LOG3("Inside actiondone statement");
-
-        LOG3("actionDone: ");
-
-        LOG3(actionDone);
+        LOG3("actionDone: "+String(actionDone));
     }
 }
 

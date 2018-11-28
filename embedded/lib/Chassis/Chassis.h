@@ -60,6 +60,8 @@ class Chassis : public Component
     int numLeft;
     bool actionDone = false;
     int speed;
+    String direc;
+    int direcErr;
 
     //Sensor variables
     int sensor[5];

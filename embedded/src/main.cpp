@@ -139,18 +139,35 @@ void loopTask() // loops through all unhandeled tasks
 
 void transportBox1() // used to transport the Smart Box, 1 is for Setup from Luciano Bettinaglio, can be editted for other Setups
 {
-    //transport box TODO -> see other file to get right commands
-    // do move until condition set, call checkForUrgendTasks on regular basis
-    // TODO: möglichst schneller Durchlauf!
+
+    if (vehicleSonar->readSonar() > DIST_TO_BOX) // very simple case that vehicle can drive forward in one line to Box
+    {
+        vehicleChassis->driveStraight();
+        checkForUrgendTasks();
+    }
+    else
+    {
+        vehicleChassis->stop();
+        checkForUrgendTasks();
+        vehicleHoist->unload();
+    }
+
     mNetwP->loop();
     if (checkForUrgendTasks)
         ; // TODO if urgent task arrived
 
     // if transported:
     mNetwP->publishMessage("Vehicle/" + mNetwP->getHostName() + "/ack", "{request:" + toparr[1] + "}"); // publish acknoledgement transported to Vehicle/...ID.../ack
+    myFuncToCall = transportBox2;
+};
+
+void transportBox2()
+{
+    vehicleHoist->load();
+    vehicleChassis->driveBack();
     stat = status_main::status_hasRequest;
     myFuncToCall = loopTask;
-};
+}
 
 bool checkForUrgendTasks() // during transport checks if something is very urgent, true if urgent task arrived
 {
@@ -171,6 +188,7 @@ void setup() // for initialisation
     vehicleSonar = new Sonar(SONAR_SERVO_PIN, SONAR_TRIGGER_PIN, SONAR_ECHO_PIN, SONAR_MAX_DISTANCE, MIN_ERROR, MAX_ERROR, MIN_TURN_ANGLE, MAX_TURN_ANGLE);
     vehicleVision = new Vision(VISION_START_ANGLE, VISION_SERVO_PIN, VISION_DELAY_FACTOR, VISION_TOLERANCE_LEFT, VISION_TOLERANCE_RIGHT);
     vehicleHoist = new Hoist(HOIST_SERVO_PIN, HOIST_SERVO_DELAY, HOIST_POISITION_MAX, HOIST_POSITION_MIN);
+    vehicleChassis = new Chassis(SPEED, K_P, K_I, K_D, RIGHT_MOTOR, LEFT_MOTOR, PIN_SENSOR_0, PIN_SENSOR_1, PIN_SENSOR_2, PIN_SENSOR_3, PIN_SENSOR_4);
 
     // TODO: #define isVehicle true/false -> verschiedene main.cpp laden
     JSarra = mNetwP->JSarrP;

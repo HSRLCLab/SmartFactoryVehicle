@@ -10,7 +10,7 @@
 */
 
 #define MAX_NUMBEROFSERVABLE_SMARTBOX_REQUESTS 10
-
+#define DIST_TO_BOX 0.5   // distance to SmartBox in cm
 
 
 // below is copied from Configuration.h

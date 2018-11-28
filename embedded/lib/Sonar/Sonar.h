@@ -30,6 +30,7 @@ public:
     void loop(SonarState *state, int directionError, bool servoActive);
     void turnSonar(int directionError);
     void calculateSonarFactor(SonarState *state);
+    int readSonar();
 
 protected:
     NewPing *sonar;
