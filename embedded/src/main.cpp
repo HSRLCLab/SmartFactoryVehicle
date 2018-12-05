@@ -190,7 +190,6 @@ void setup() // for initialisation
     vehicleHoist = new Hoist(HOIST_SERVO_PIN, HOIST_SERVO_DELAY, HOIST_POISITION_MAX, HOIST_POSITION_MIN);
     vehicleChassis = new Chassis(SPEED, K_P, K_I, K_D, RIGHT_MOTOR, LEFT_MOTOR, PIN_SENSOR_0, PIN_SENSOR_1, PIN_SENSOR_2, PIN_SENSOR_3, PIN_SENSOR_4);
 
-    // TODO: #define isVehicle true/false -> verschiedene main.cpp laden
     JSarra = mNetwP->JSarrP;
     mNetwP->subscribe("SmartBox/+/level");
     mNetwP->subscribe("SmartBox/+/decision");
@@ -217,7 +216,7 @@ void loop() // one loop per one cycle (SB full -> transported -> returned empty)
 
     mNetwP->loop();
     if (publishParams)
-        mNetwP->publishMessage("Vehicle/" + mNetwP->getHostName() + "/params", "{params:[100,100" + String(numOfTasksToDo) + "] }"); // publish params [distance, velocity, tasks]
+        mNetwP->publishMessage("Vehicle/" + mNetwP->getHostName() + "/params", "{params:[100,100" + String(numOfTasksToDo) + "] }"); // publish params, see documentation
     // TODO: define above signal/array list
     // TODO: params in callback2 of SmartBox???
 
