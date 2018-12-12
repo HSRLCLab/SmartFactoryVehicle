@@ -21,7 +21,7 @@ struct myJSONStr {
   String hostname = "";
   String request = "";
   int level = -5;
-  double vehicleParams[5]; // TODO 5?
+  double vehicleParams[5];
 } ;
 
 enum SBLevel                                          // describes Smart Box level states, -5 is default if not set!
