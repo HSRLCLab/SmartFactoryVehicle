@@ -149,7 +149,7 @@ void transportBox1() // used to transport the Smart Box, 1 is for Setup from Luc
         vehicleHoist->unload();
     }
     mNetwP->loop();
-    if (TaskMain->hasUrgentMessage())
+    if (TaskMain->hasUrgentMessage()) // here emergency stopping functionality can be added
         myJSONStr nextTaskTodo = doLastUrgentMessage();
 
     // if transported:
