@@ -9,7 +9,8 @@ bool SmartBoxList::push(String &hostname)
 {
     if (iterator < MAX_SMARTBOXES_TOLISTENTO)
     {
-        iterator++ hostnames[iterator] = hostname;
+        iterator++;
+        hostnames[iterator] = hostname;
         return true;
     }
     else
@@ -47,7 +48,6 @@ bool SmartBoxList::isInList(String &hostname)
     }
     return returns;
 }
-
 
 int SmartBoxList::getSize()
 {

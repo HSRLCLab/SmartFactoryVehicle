@@ -1,6 +1,8 @@
 #ifndef SMARTBOXLIST_H
 #define SMARTBOXLIST_H
 
+#include <Arduino.h>
+
 class SmartBoxList // stores valuable SmartBoxes
 {
 public:
