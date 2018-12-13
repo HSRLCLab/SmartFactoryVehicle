@@ -10,6 +10,8 @@ MQTTTasks::MQTTTasks()
     mqtt_class_counter = 0;
     mqtt_class_counter_full = 0;
     isEmpty = false;
+    urgentMessage = 0;
+    startIteration = 0;
 }
 
 myJSONStr MQTTTasks::getLastMessage()
@@ -22,18 +24,49 @@ myJSONStr MQTTTasks::getLastMessage()
         LOG2("there has been no messages saved");
     }
 }
+myJSONStr MQTTTasks::doLastMessage()
+{
+    myJSONStr tmp = getLastMessage();
+    deleteMessage(0);
+    return tmp;
+}
+
+myJSONStr MQTTTasks::doLastUrgentMessage()
+{
+    myJSONStr tmp;
+    for (int i = 0; i < MAX_JSON_MESSAGES_SAVED; i++)
+    {
+        if (getDesiredLastMessage(i).urgent)
+        {
+            tmp = getDesiredLastMessage(i);
+            deleteMessage(i);
+            return tmp;
+            break;
+        }
+    }
+    return tmp;
+}
+
+bool MQTTTasks::hasUrgentMessage()
+{
+    if (urgentMessage == 0)
+        return false;
+    else
+        return true;
+}
 
 myJSONStr MQTTTasks::getDesiredLastMessage(int fromLast)
 {
+    myJSONStr tmp;
     if (!isEmpty)
     {
         if ((fromLast <= MAX_JSON_MESSAGES_SAVED) && (fromLast >= 0))
         {
             int res = mqtt_class_counter - fromLast;
             if (res < 0)
-                return messages[MAX_JSON_MESSAGES_SAVED + res];
+                tmp = messages[MAX_JSON_MESSAGES_SAVED + res];
             else
-                return messages[res];
+                tmp = messages[res];
         }
         else
         {
@@ -41,6 +74,81 @@ myJSONStr MQTTTasks::getDesiredLastMessage(int fromLast)
             LOG2("you entered: " + String(fromLast) + ", but there is a maximum of: " + String(MAX_JSON_MESSAGES_SAVED) + "and a minimum of 0!");
         }
     }
+    return tmp;
+}
+
+myJSONStr MQTTTasks::getDesiredMessage(int certainCurrentIterator)
+{
+    myJSONStr tmp;
+    if (!isEmpty)
+    {
+        if (certainCurrentIterator >= 0)
+        {
+            int currIt = certainCurrentIterator % MAX_JSON_MESSAGES_SAVED;
+            tmp = messages[currIt];
+        }
+        else
+        {
+            LOG1("request of desired message failed");
+            LOG2("you entered: " + String(certainCurrentIterator) + ", but there is a minimum of 0!");
+        }
+    }
+    return tmp;
+}
+myJSONStr MQTTTasks::getDoDesiredMessage(int certainCurrentIterator)
+{
+    myJSONStr tmp;
+    if (!isEmpty)
+    {
+        if (certainCurrentIterator >= 0)
+        {
+            int currIt = certainCurrentIterator % MAX_JSON_MESSAGES_SAVED;
+            tmp = doLastMessage();
+        }
+        else
+        {
+            LOG1("request of desired message failed");
+            LOG2("you entered: " + String(certainCurrentIterator) + ", but there is a minimum of 0!");
+        }
+    }
+    return tmp;
+}
+
+bool MQTTTasks::setStartforIterations(int fromCurrentIterator)
+{
+    if (fromCurrentIterator <= fromCurrentIterator)
+    {
+        startIteration = fromCurrentIterator;
+        return true;
+    }
+
+    else
+    {
+        LOG2("Iterator is wrong");
+        LOG3("you entered: " + String(fromCurrentIterator));
+        return false;
+    }
+}
+
+bool MQTTTasks::setCurrentIteratorforIterations()
+{
+    startIteration = mqtt_class_counter;
+    return true;
+}
+
+myJSONStr MQTTTasks::iterateAndDoMessages()
+{
+    myJSONStr tmp;
+    if (startIteration == mqtt_class_counter)
+    {
+        ; // if default values from myJSONStr are returned, it will be shown here
+    }
+    else
+    {
+        tmp = getDesiredMessage(startIteration);
+        startIteration++;
+    }
+    return tmp;
 }
 
 int MQTTTasks::returnCurrentIterator() // returns absolute counter, if MAX_JSON_MESSAGES_SAVED reached and first message is overridden it can be detected from outside!
@@ -51,6 +159,7 @@ int MQTTTasks::returnCurrentIterator() // returns absolute counter, if MAX_JSON_
 bool MQTTTasks::deleteMessage(int fromLast) // sets this struct to default
 {
     myJSONStr tmp;
+    tmp.hostname = "del"; // to clearly see which one were deleted
     if (!isEmpty)
     {
         if ((fromLast < MAX_JSON_MESSAGES_SAVED) && (fromLast >= 0))
@@ -58,12 +167,16 @@ bool MQTTTasks::deleteMessage(int fromLast) // sets this struct to default
             int res = mqtt_class_counter - fromLast;
             if (res < 0)
             {
+                if (messages[MAX_JSON_MESSAGES_SAVED + res].urgent)
+                    urgentMessage--;
                 messages[MAX_JSON_MESSAGES_SAVED + res] = tmp;
                 LOG3("message " + String(MAX_JSON_MESSAGES_SAVED + res) + " deleted successfully");
                 return true;
             }
             else
             {
+                if (messages[res].urgent)
+                    urgentMessage--;
                 messages[res] = tmp;
                 LOG3("message " + String(res) + " deleted successfully");
                 return true;
@@ -95,6 +208,8 @@ bool MQTTTasks::addMessage(myJSONStr mess)
         isEmpty = false;
         return true;
     }
+    if (mess.urgent)
+        urgentMessage++;
     LOG3("message added successfully");
 }
 
@@ -137,12 +252,12 @@ String *MQTTTasks::returnMQTTtopics(myJSONStr passingMessage)
         return stringpassing;
     }
     else
-        LOG3("k3 has no reasonable value");
+    {
+        LOG3("k3 has no reasonable value: " + String(k3));
+        return nullptr;
+    }
 }
 
-int returnNumOfVehicles(String &topicToNumOf)
-{
-}
 
 myJSONStr *MQTTTasks::getBetween(int from, int to) // from index to index
 {
@@ -165,7 +280,7 @@ myJSONStr *MQTTTasks::getBetween(int from, int to) // from index to index
     }
     else
     {
-        LOG3("tmp_from_cycles :" + String(tmp_from_cycles) + "\t tmp_to_cycles: " + String(tmp_to_cycles) + "\t tmp_from: " + String(tmp_from) + "\t tmp_to: " + String(tmp_to)); // TODO
+        // LOG3("tmp_from_cycles :" + String(tmp_from_cycles) + "\t tmp_to_cycles: " + String(tmp_to_cycles) + "\t tmp_from: " + String(tmp_from) + "\t tmp_to: " + String(tmp_to)); // can be used for debugging
 
         if (from == to)
         {
@@ -208,7 +323,7 @@ myJSONStr *MQTTTasks::getBetween(int from, int to) // from index to index
         else
             LOG1("special case");
 
-        //LOG2("size to return: " + String(returnBetween[0].level)); // TODO
+        //LOG2("size to return: " + String(returnBetween[0].level)); //
         //for (int i = 1; i < returnBetween[0].level; i++)
         //    LOG3("the " + String(i) + "-th Element to return is: " + returnBetween[i].hostname);
         return returnBetween;

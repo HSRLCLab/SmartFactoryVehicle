@@ -2,7 +2,10 @@
 #define SMARTBOXLIST_H
 
 #include <Arduino.h>
+<<<<<<< HEAD
+=======
 #include <SmartBoxListConfiguration.h>
+>>>>>>> 475470f89eaaf070c0bbb251460f021db20224e1
 
 class SmartBoxList // stores valuable SmartBoxes
 {

@@ -50,7 +50,7 @@ void (*myFuncToCall)() = nullptr; // func to call in main-loop, for finite state
 
 // ===================================== my helper Functions =====================================
 
-void getVehicleInfo(){} // print Smart Box Information TODO
+void getVehicleInfo(){} // print Smart Box Information
 {
     LOG2("Vehicle state: " + String(stat));
     LOG2("Variable has answered: " + String(hasAnswered));
@@ -139,22 +139,18 @@ void loopTask() // loops through all unhandeled tasks
 
 void transportBox1() // used to transport the Smart Box, 1 is for Setup from Luciano Bettinaglio, can be editted for other Setups
 {
-
     if (vehicleSonar->readSonar() > DIST_TO_BOX) // very simple case that vehicle can drive forward in one line to Box
     {
         vehicleChassis->driveStraight();
-        checkForUrgendTasks();
     }
     else
     {
         vehicleChassis->stop();
-        checkForUrgendTasks();
         vehicleHoist->unload();
     }
-
     mNetwP->loop();
-    if (checkForUrgendTasks)
-        ; // TODO if urgent task arrived
+    if (TaskMain->hasUrgentMessage()) // here emergency stopping functionality can be added
+        myJSONStr nextTaskTodo = doLastUrgentMessage();
 
     // if transported:
     mNetwP->publishMessage("Vehicle/" + mNetwP->getHostName() + "/ack", "{request:" + toparr[1] + "}"); // publish acknoledgement transported to Vehicle/...ID.../ack
@@ -169,11 +165,6 @@ void transportBox2()
     myFuncToCall = loopTask;
 }
 
-bool checkForUrgendTasks() // during transport checks if something is very urgent, true if urgent task arrived
-{
-    return false;
-    // TODO
-};
 
 // ===================================== Arduino Functions =====================================
 void setup() // for initialisation
@@ -196,7 +187,7 @@ void setup() // for initialisation
     TaskMain = mNetwP->NetManTask_classPointer;
     myFuncToCall = loopNoTask;
 
-    if (true) // for debugging purpose, DELETE ON FINAL TODO
+    if (true) // for debugging purpose
     {
         pinMode(13, OUTPUT); // debug LED
     }
@@ -204,7 +195,7 @@ void setup() // for initialisation
 
 void loop() // one loop per one cycle (SB full -> transported -> returned empty)
 {
-    if (true) // degug cycle -- DELETE ON FINAL TODO
+    if (true) // degug cycle
     {
         digitalWrite(13, LOW);
         delay(1000);
