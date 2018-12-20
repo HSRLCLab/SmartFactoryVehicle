@@ -208,16 +208,4 @@ void loop() // one loop per one cycle (SB full -> transported -> returned empty)
     mNetwP->loop();
     if (publishParams)
         mNetwP->publishMessage("Vehicle/" + mNetwP->getHostName() + "/params", "{params:[100,100" + String(numOfTasksToDo) + "] }"); // publish params, see documentation
-    // TODO: define above signal/array list
-    // TODO: params in callback2 of SmartBox???
-
-    /*
-    if (publishAck)
-    {
-        for(int i=0; i<=SB_hostnames_it; i++)
-        {
-            mNetwP->publishMessage("Vehicle/" + mNetwP->getHostName() + "/ack", "{hostname:" + SB_hostnames[i] + "}");
-        }
-    }
-    */
 }
